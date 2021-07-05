@@ -16,6 +16,10 @@ using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Net;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http;
+using DatingApp.API.Helpers;
 
 namespace DatingApp.API
 {
@@ -41,9 +45,10 @@ namespace DatingApp.API
             //services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Latest);
             services.AddCors();
             //one instance for each http request but it uses the same instance
-            services.AddScoped<IAuthRepository,AuthRepository>();
+            services.AddScoped<IAuthRepository, AuthRepository>();
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options => {
+            .AddJwtBearer(options =>
+            {
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
@@ -57,25 +62,41 @@ namespace DatingApp.API
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            if (env.IsDevelopment())
+            // if (env.IsDevelopment())
+            // {
+            //     app.UseDeveloperExceptionPage();
+            //     app.UseSwagger();
+            //     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "DatingApp.API v1"));
+            // }
+            // else{
+            app.UseExceptionHandler(builder =>
             {
-                app.UseDeveloperExceptionPage();
-                app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "DatingApp.API v1"));
-            }
-            else{
-                ///app.UseHsts();
-            }
+                builder.Run(async context =>
+                {
+                    context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+
+                    var error = context.Features.Get<IExceptionHandlerFeature>();
+                    if (error != null)
+                    {
+                        context.Response.AddApplicationError(error.Error.Message);
+                        await context.Response.WriteAsync(error.Error.Message);
+                    }
+                });
+            });
+            ///app.UseHsts();
+            // }
 
             //app.UseHttpsRedirection();
 
             app.UseRouting();
             app.UseAuthentication();
             app.UseAuthorization();
-            
+
             //app.UseMvc();
-            app.UseCors(x=> x.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
             
+            //TODO: find out why aparently this is still needed 
+            app.UseCors(x=> x.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
